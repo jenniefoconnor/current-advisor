@@ -860,18 +860,20 @@ function cmpLoadData() {
 /* ====================================================================== */
 
 /* ---- editable tuning ---- */
-var OPP_TIDE_STATION = '9414290';      // San Francisco — central-bay tide reference (Belvedere high water lags ~mins)
+var OPP_TIDE_STATION  = '9414817';      // Angel Island (west side) — tide-height gauge at Raccoon Strait
+var OPP_TIDE_FALLBACK = '9414290';      // San Francisco — used only if the Angel Island gauge isn't served by the API
 var OPP_LAT = 37.83, OPP_LNG = -122.45; // SF Bay point used for sunrise
 var OPP_LIGHT   = 0.5;   // kt — "slack / light" ceiling (Angel Island Row; Raccoon "slack" for Belvedere)
 var OPP_STRONG  = 1.5;   // kt — "strong" flood/ebb at Crissy sunrisers
 var OPP_SUN_WIN = 75;    // min — half-window when reporting the nearby sunrise peak (display only)
 var OPP_TIDE_WIN = 90;   // min — high tide must fall within this of 8:00 (Belvedere)
 var OPP_BELV_HOUR = 8;   // Belvedere target hour (local)
+var OPP_BELV_MIN_HIGH = 5.0; // ft — ignore highs below this height (too mucky to get in below ~5 ft)
 var OPP_ROW_START = 7, OPP_ROW_END = 9; // Angel Island Row window (local hours)
 
 var OPP_ROUTES = [
   { key:'belvedere',      name:'Belvedere Cove swim',           color:'#1D9E75',
-    cond:'Saturdays with a high tide near 8:00 am at Raccoon Strait and the current slack or flooding (Raccoon Strait \u00b7 SFB1212 + SF tide).' },
+    cond:'Saturdays with a high tide above 5 ft near 8:00 am \u2014 deep enough to get in cleanly (Raccoon Strait / Angel Island gauge; current shown for context).' },
   { key:'crissy_wh',      name:'Crissy to Warming Hut sunriser', color:'#1a6fba',
     cond:'A strong flood at the time of sunrise (Crissy Field \u00b7 SFB1202).' },
   { key:'aquatic_crissy', name:'Aquatic Park to Crissy sunriser', color:'#8e44ad',
@@ -938,14 +940,19 @@ function oppFetchCurrent(id, startMs, endMs) {
       return cp.map(function(e){ return { t:new Date(e.Time), v:parseFloat(e.Velocity_Major) }; }); },
     startMs, endMs);
 }
-function oppFetchTide(startMs, endMs) {
+function oppFetchTideFor(station, startMs, endMs) {
   return oppFetchRange(
-    function(b,e){ return PROXY+'?station='+OPP_TIDE_STATION+'&begin_date='+b+'&end_date='+e+
+    function(b,e){ return PROXY+'?station='+station+'&begin_date='+b+'&end_date='+e+
       '&product=predictions&datum=MLLW&time_zone=lst_ldt&units=english&format=json&interval=hilo'; },
     function(j){ var pr=j.predictions||[];
-      if(!pr.length) throw new Error('no tide data');
+      if(!pr.length) throw new Error('no tide data '+station);
       return pr.map(function(e){ return { t:new Date(e.t), v:parseFloat(e.v), type:e.type }; }); },
     startMs, endMs);
+}
+function oppFetchTide(startMs, endMs) {
+  return oppFetchTideFor(OPP_TIDE_STATION, startMs, endMs).catch(function(){
+    return oppFetchTideFor(OPP_TIDE_FALLBACK, startMs, endMs);   // Angel Island unavailable -> use San Francisco
+  });
 }
 
 /* ---- evaluation ---- */
@@ -958,21 +965,23 @@ function oppEvaluate(curves, tide, startMs, days, weekendsOnly) {
     var d=new Date(startMs + dd*24*3600e3), dow=d.getDay(), hits=[];
     var sr=oppSunrise(d);
 
-    // Belvedere Cove — Saturday, high tide near 8:00, Raccoon slack or flooding
+    // Belvedere Cove — Saturday with a high tide near 8:00 (depth is the driver;
+    // at high water the current is already near slack, so it's reported for context only)
     if (dow===6) {
       var tgt=oppAtHour(d, OPP_BELV_HOUR, 0), best=null;
       for (var i=0;i<tide.length;i++) {
-        if (tide[i].type==='H' && Math.abs(tide[i].t-tgt) <= OPP_TIDE_WIN*60e3)
+        if (tide[i].type==='H' && tide[i].v >= OPP_BELV_MIN_HIGH && Math.abs(tide[i].t-tgt) <= OPP_TIDE_WIN*60e3)
           if (!best || Math.abs(tide[i].t-tgt) < Math.abs(best.t-tgt)) best=tide[i];
       }
       if (best) {
-        var rv=interpolate(rac, tgt);
-        if (rv > -OPP_LIGHT) {
-          var desc;
-          if (rv >= OPP_LIGHT) desc='flooding '+rv.toFixed(1)+' kt';
-          else { var ahead=interpolate(rac, new Date(tgt.getTime()+30*60e3)); desc=(ahead>rv?'slack, turning to flood':'near slack'); }
-          hits.push({ key:'belvedere', detail:'High tide '+fmtTime(best.t)+' ('+best.v.toFixed(1)+' ft) \u00b7 Raccoon current '+desc });
-        }
+        var rv=interpolate(rac, tgt), arv=Math.abs(rv);
+        var desc;
+        if (arv < OPP_LIGHT) {
+          var ahead=interpolate(rac, new Date(tgt.getTime()+30*60e3));
+          desc = ahead < rv - 0.05 ? 'current near slack, ebb building' :
+                 ahead > rv + 0.05 ? 'current near slack, flood building' : 'current near slack';
+        } else desc = rv > 0 ? 'current flooding '+rv.toFixed(1)+' kt' : 'current ebbing '+arv.toFixed(1)+' kt';
+        hits.push({ key:'belvedere', detail:'High tide '+fmtTime(best.t)+' ('+best.v.toFixed(1)+' ft) \u00b7 '+desc });
       }
     }
 
