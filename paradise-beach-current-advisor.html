@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Paradise Beach Current Advisor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: #f5f5f5; padding: 1rem; color: #1a1a1a;
+    }
+    .widget-wrap {
+      background: #fff; border: 1px solid #e0e0e0; border-radius: 14px;
+      padding: 1.25rem 1.5rem 1.5rem; max-width: 680px; margin: 0 auto;
+    }
+    .widget-title { font-size: 18px; font-weight: 600; color: #1a1a1a; margin-bottom: 2px; }
+    .widget-subtitle { font-size: 13px; color: #666; margin-bottom: 6px; }
+    .status-row { display: flex; align-items: center; gap: 6px; margin-bottom: 1rem; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #999; display: inline-block; }
+    .status-label { font-size: 12px; color: #888; }
+    .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    .controls label { font-size: 13px; color: #555; white-space: nowrap; }
+    .controls input[type="datetime-local"] {
+      flex: 1; min-width: 180px; font-size: 14px; padding: 7px 10px;
+      border: 1px solid #ddd; border-radius: 8px; background: #fafafa; color: #1a1a1a;
+    }
+    .controls select {
+      font-size: 13px; padding: 7px 10px; border: 1px solid #ddd;
+      border-radius: 8px; background: #fafafa; color: #1a1a1a; cursor: pointer;
+    }
+    .controls button {
+      font-size: 13px; font-weight: 600; padding: 8px 16px; border-radius: 8px;
+      border: none; background: #1a6fba; color: #fff; cursor: pointer; white-space: nowrap;
+    }
+    .controls button:hover { background: #155a9a; }
+    .msg { font-size: 13px; color: #888; padding: .4rem 0; }
+    .msg.error { color: #c0392b; }
+    .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
+    .metric-card { background: #f8f8f8; border-radius: 10px; padding: .75rem 1rem; text-align: center; }
+    .metric-label { font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .05em; }
+    .metric-value { font-size: 22px; font-weight: 600; color: #1a1a1a; }
+    .main-grid { display: grid; grid-template-columns: 180px 1fr; gap: 1rem; margin-bottom: 1rem; align-items: start; }
+    @media (max-width: 480px) { .main-grid { grid-template-columns: 1fr; } }
+    .compass-card {
+      background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem;
+      display: flex; flex-direction: column; align-items: center; gap: .5rem;
+    }
+    .compass-section-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .05em; font-weight: 500; }
+    .compass-label { font-size: 12px; color: #555; text-align: center; line-height: 1.4; }
+    .advice-col { display: flex; flex-direction: column; gap: .75rem; }
+    .section-label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .05em; font-weight: 500; margin-bottom: 6px; }
+    .advice-box {
+      border-left: 3px solid #1D9E75; background: #f8f8f8; padding: .75rem 1rem;
+      font-size: 14px; line-height: 1.65; color: #1a1a1a; border-radius: 0 8px 8px 0;
+    }
+    .advice-box.ebb { border-left-color: #378ADD; }
+    .advice-box.slack { border-left-color: #999; }
+    .strength-bar-bg { height: 6px; border-radius: 3px; background: #eee; overflow: hidden; }
+    .strength-bar-fill { height: 100%; border-radius: 3px; transition: width .5s ease, background .5s ease; width: 0%; background: #1D9E75; }
+    .strength-labels { display: flex; justify-content: space-between; font-size: 11px; color: #aaa; margin-top: 3px; }
+    .card { background: #fff; border: 1px solid #e8e8e8; border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1rem; }
+    .event-row { display: flex; align-items: center; gap: 8px; font-size: 13px; padding: 5px 0; border-bottom: 1px solid #f0f0f0; }
+    .event-row:last-child { border-bottom: none; }
+    .event-badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 4px; min-width: 68px; text-align: center; }
+    .badge-flood { background: #e1f5ee; color: #0f6e56; }
+    .badge-ebb { background: #e6f1fb; color: #185fa5; }
+    .badge-slack { background: #f0f0f0; color: #666; }
+    .event-time { flex: 1; color: #1a1a1a; }
+    .event-speed { color: #888; min-width: 44px; text-align: right; }
+    .event-dir { color: #aaa; font-size: 12px; min-width: 110px; text-align: right; }
+    .legend { display: flex; gap: 16px; font-size: 12px; color: #888; margin-bottom: 8px; flex-wrap: wrap; }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
+    .pill { font-size: 11px; padding: 3px 8px; border-radius: 4px; }
+    .noaa-credit { font-size: 11px; color: #bbb; text-align: center; margin-top: 1rem; }
+    .noaa-credit a { color: #bbb; }
+  </style>
+</head>
+<body>
+<div class="widget-wrap">
+
+  <p class="widget-title">Paradise Beach current advisor</p>
+  <p class="widget-subtitle" id="widget-subtitle">Raccoon Strait &middot; Station SFB1212 &middot; Paradise Beach Park, Tiburon</p>
+  <div class="status-row">
+    <span class="status-dot" id="data-status"></span>
+    <span class="status-label" id="data-status-label">loading&hellip;</span>
+  </div>
+
+  <div class="controls">
+    <label for="swim-dt">Swim date &amp; time</label>
+    <input type="datetime-local" id="swim-dt" />
+    <select id="station-select" onchange="loadData()" style="font-size:13px; padding:7px 10px; border:1px solid #ddd; border-radius:8px; background:#fafafa; color:#1a1a1a; cursor:pointer;">
+      <option value="SFB1212" data-name="Raccoon Strait" data-surf="330" data-point="150" data-surflabel1="surf" data-surflabel2="boards" data-pointlabel1="the" data-pointlabel2="point">Raccoon Strait (default)</option>
+      <option value="SFB1202" data-name="Crissy Field" data-surf="80" data-point="260" data-surflabel1="Alcatraz" data-surflabel2="" data-pointlabel1="Golden Gate" data-pointlabel2="Bridge">Crissy Field - Golden Gate Bridge</option>
+      <option value="SFB1203" data-name="Yellow Bluff" data-surf="13" data-point="211" data-surflabel1="Richardson" data-surflabel2="Bay" data-pointlabel1="Golden Gate" data-pointlabel2="Bridge">Yellow Bluff</option>
+    </select>
+    <button onclick="loadData()">Load currents</button>
+  </div>
+
+  <p class="msg" id="loading-msg" style="display:none;">Fetching NOAA data&hellip;</p>
+  <p class="msg error" id="error-msg" style="display:none;"></p>
+
+  <div class="metrics">
+    <div class="metric-card">
+      <p class="metric-label">Current speed</p>
+      <p class="metric-value" id="speed-val">&mdash;</p>
+    </div>
+    <div class="metric-card">
+      <p class="metric-label">Phase</p>
+      <p class="metric-value" id="phase-val" style="font-size:15px; padding-top:4px;">&mdash;</p>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <div class="compass-card">
+      <p class="compass-section-label">Start swimming</p>
+      <svg viewBox="0 0 120 120" width="130" height="130" role="img" aria-label="Compass showing recommended swim start direction">
+        <circle cx="60" cy="60" r="56" fill="none" stroke="#e8e8e8" stroke-width="1.5"/>
+        <circle cx="60" cy="60" r="52" fill="#f8f8f8"/>
+        <text x="60" y="13"  text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">N</text>
+        <text x="60" y="114" text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">S</text>
+        <text x="9"  y="64"  text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">W</text>
+        <text x="111" y="64" text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">E</text>
+        <text id="compass-surf1"  x="35" y="22"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">surf</text>
+        <text id="compass-surf2"  x="35" y="31"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">boards</text>
+        <text id="compass-point1" x="85" y="97"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">the</text>
+        <text id="compass-point2" x="85" y="106" text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">point</text>
+        <line id="compass-axis" x1="33" y1="18" x2="87" y2="102" stroke="#ddd" stroke-width="1" stroke-dasharray="3,3"/>
+        <g id="swim-arrow" style="transform-origin:60px 60px; transform:rotate(0deg); transition:transform .8s ease;">
+          <polygon points="60,20 67,48 60,43 53,48" fill="#1D9E75" opacity="0.95"/>
+          <polygon points="60,100 67,72 60,77 53,72" fill="#1D9E75" opacity="0.2"/>
+          <line x1="60" y1="28" x2="60" y2="92" stroke="#1D9E75" stroke-width="1.5" opacity="0.35"/>
+        </g>
+        <circle cx="60" cy="60" r="5" fill="#fff" stroke="#ddd" stroke-width="1"/>
+      </svg>
+      <p class="compass-label" id="compass-label">Select a time</p>
+    </div>
+
+    <div class="advice-col">
+      <div>
+        <p class="section-label">Swim advice</p>
+        <div class="advice-box" id="advice-text">Select a date and time above, then click "Load currents" for your swim recommendation.</div>
+      </div>
+      <div>
+        <p class="section-label">Current strength</p>
+        <div class="strength-bar-bg"><div class="strength-bar-fill" id="strength-bar"></div></div>
+        <div class="strength-labels"><span>Slack</span><span>Moderate</span><span>Strong</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card" id="chart-card" style="display:none;">
+    <p class="section-label" id="chart-label">Current speed curve</p>
+    <div class="legend">
+      <span><span class="legend-dot" style="background:#1D9E75;"></span> Flood</span>
+      <span><span class="legend-dot" style="background:#378ADD;"></span> Ebb</span>
+      <span><span class="legend-dot" style="background:#e67e22;"></span> Selected time</span>
+    </div>
+    <div id="chart-svg-wrap"></div>
+    <div class="pills" id="chart-pills"></div>
+  </div>
+
+  <div class="card">
+    <p class="section-label" id="schedule-label">Current schedule</p>
+    <div id="events-list"><p style="font-size:13px;color:#aaa;">Load currents to see the schedule.</p></div>
+  </div>
+
+  <p class="noaa-credit">
+    Current predictions from <a href="https://tidesandcurrents.noaa.gov" target="_blank">NOAA Tides &amp; Currents</a> &middot; Not for navigation
+  </p>
+
+</div>
+<script>
+var PROXY        = 'https://noaa-currents-proxy.jenniefoconnor.workers.dev';
+var SLACK_THRESH = 0.25;
+var MAX_SPEED    = 3.0;
+var DAY_NAMES    = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+var MONTH_NAMES  = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+function getStationConfig() {
+  var sel = document.getElementById('station-select');
+  var opt = sel.options[sel.selectedIndex];
+  return {
+    id:          opt.value,
+    name:        opt.getAttribute('data-name'),
+    surfAngle:   parseInt(opt.getAttribute('data-surf')),
+    pointAngle:  parseInt(opt.getAttribute('data-point')),
+    surfLabel1:  opt.getAttribute('data-surflabel1'),
+    surfLabel2:  opt.getAttribute('data-surflabel2'),
+    pointLabel1: opt.getAttribute('data-pointlabel1'),
+    pointLabel2: opt.getAttribute('data-pointlabel2')
+  };
+}
+
+function pad(n) { return String(n).padStart(2,'0'); }
+
+function fmtTime(t) {
+  if (!t) return '--';
+  var h = t.getHours(), m = t.getMinutes();
+  return ((h % 12) || 12) + ':' + pad(m) + ' ' + (h >= 12 ? 'PM' : 'AM');
+}
+
+function dateLabel(dt) {
+  return DAY_NAMES[dt.getDay()] + ' ' + MONTH_NAMES[dt.getMonth()] + ' ' + dt.getDate();
+}
+
+function getUpcomingSaturday() {
+  var now  = new Date();
+  var diff = now.getDay() === 6 ? 0 : 6 - now.getDay();
+  var sat  = new Date(now);
+  sat.setDate(now.getDate() + diff);
+  sat.setHours(8, 30, 0, 0);
+  return sat;
+}
+
+function initDateTime() {
+  var sat = getUpcomingSaturday();
+  document.getElementById('swim-dt').value =
+    sat.getFullYear() + '-' + pad(sat.getMonth()+1) + '-' + pad(sat.getDate()) + 'T08:30';
+}
+
+function interpolate(curve, t) {
+  if (!curve.length) return 0;
+  var prev = null, next = null;
+  for (var i = 0; i < curve.length; i++) {
+    if (curve[i].t <= t) prev = curve[i];
+    if (curve[i].t > t && !next) next = curve[i];
+  }
+  if (!prev) return curve[0].v;
+  if (!next)  return curve[curve.length-1].v;
+  var frac = (t - prev.t) / (next.t - prev.t);
+  return prev.v + frac * (next.v - prev.v);
+}
+
+function surrounding(events, t) {
+  var prev = null, next = null;
+  for (var i = 0; i < events.length; i++) {
+    if (events[i].t <= t) prev = events[i];
+    if (events[i].t > t && !next) next = events[i];
+  }
+  return { prev: prev, next: next };
+}
+
+function nextOfType(events, t, type) {
+  for (var i = 0; i < events.length; i++) {
+    if (events[i].t > t && events[i].type === type) return events[i];
+  }
+  return null;
+}
+
+function buildAdvice(speed, events, now) {
+  var cfg         = getStationConfig();
+  var SURF_ANGLE  = cfg.surfAngle;
+  var POINT_ANGLE = cfg.pointAngle;
+  var SURF_NAME   = (cfg.surfLabel1 + ' ' + cfg.surfLabel2).trim();
+  var POINT_NAME  = (cfg.pointLabel1 + ' ' + cfg.pointLabel2).trim();
+  var sur         = surrounding(events, now);
+  var next        = sur.next;
+  var abs         = Math.abs(speed);
+  var isSlack     = abs < SLACK_THRESH;
+  var isFlood     = speed > 0 && !isSlack;
+  var real        = new Date();
+  var diffMin     = (now - real) / 60000;
+  var isPast      = diffMin < -30;
+  var isFut       = diffMin > 30;
+
+  var WAS    = isPast ? 'was'               : isFut ? 'will be'       : 'is';
+  var PUSH   = isPast ? 'would have pushed' : 'will push';
+  var PUSHES = isPast ? 'pushed'            : isFut ? 'will push'     : 'pushes';
+  var START  = isPast ? 'Starting'          : isFut ? 'Plan to start' : 'Start';
+
+  var phase, angle, cls, text, label;
+
+  if (isSlack) {
+    var turning   = next ? next.type : 'unknown';
+    var peakEvent = turning !== 'unknown' ? nextOfType(events, now, turning) : null;
+    if (turning === 'flood') {
+      angle = POINT_ANGLE; cls = 'flood'; label = 'Start: toward ' + POINT_NAME;
+      phase = isPast ? 'Was slack - flooded' : isFut ? 'Slack - flooding' : 'Slack - flooding soon';
+      var ps = peakEvent ? ', peaking around ' + fmtTime(peakEvent.t) + ' at ' + Math.abs(peakEvent.speed).toFixed(1) + ' kt' : '';
+      var startDesc = isFut ? 'will be building' : isPast ? 'started building' : 'is starting';
+      text  = 'The current ' + WAS + ' near slack \u2014 the flood ' + startDesc + (ps ? ps : '') + '. ' +
+              START + ' swimming toward ' + POINT_NAME + ' \u2014 the flood ' + PUSH + ' push you back toward ' + SURF_NAME + ' on your way home.';
+    } else if (turning === 'ebb') {
+      angle = SURF_ANGLE; cls = 'ebb'; label = 'Start: toward ' + SURF_NAME;
+      phase = isPast ? 'Was slack - ebbed' : isFut ? 'Slack - ebbing' : 'Slack - ebbing soon';
+      var ps2 = peakEvent ? ', peaking around ' + fmtTime(peakEvent.t) + ' at ' + Math.abs(peakEvent.speed).toFixed(1) + ' kt' : '';
+      var startDesc2 = isFut ? 'will be building' : isPast ? 'started building' : 'is starting';
+      text  = 'The current ' + WAS + ' near slack \u2014 the ebb ' + startDesc2 + (ps2 ? ps2 : '') + '. ' +
+              START + ' swimming toward ' + SURF_NAME + ' \u2014 the ebb ' + PUSH + ' push you back toward ' + POINT_NAME + ' on your way home.';
+    } else {
+      angle = SURF_ANGLE; cls = 'slack'; label = 'Either direction'; phase = 'Slack water';
+      text  = 'The current ' + WAS + ' near slack with minimal flow. Conditions ' + (isPast ? 'were' : 'are') + ' calm \u2014 you can swim in either direction.';
+    }
+  } else if (isFlood) {
+    var nextSlack = nextOfType(events, now, 'slack');
+    var nextPeak  = nextOfType(events, now, 'flood');
+    var nd = '';
+    if (nextPeak && (!nextSlack || nextPeak.t < nextSlack.t)) {
+      nd = 'It peaks at ' + Math.abs(nextPeak.speed).toFixed(1) + ' kt around ' + fmtTime(nextPeak.t) +
+           (nextSlack ? ', then eases to slack around ' + fmtTime(nextSlack.t) + '.' : '.');
+    } else if (nextSlack) {
+      nd = 'The flood is past its peak and easing \u2014 slack arrives around ' + fmtTime(nextSlack.t) + '.';
+    }
+    phase = (isPast ? 'Flooded' : 'Flooding') + ' - ' + abs.toFixed(1) + ' kt';
+    angle = POINT_ANGLE; cls = 'flood'; label = 'Start: toward ' + POINT_NAME;
+    text  = 'The current ' + WAS + ' flooding at ' + abs.toFixed(1) + ' knots, ' + PUSHES + ' toward ' + SURF_NAME + '. ' +
+            START + ' swimming toward ' + POINT_NAME + ' (against the current) \u2014 it ' + PUSH + ' push you back toward ' + SURF_NAME + ' on your return. ' + nd;
+  } else {
+    var nextSlack2 = nextOfType(events, now, 'slack');
+    var nextPeak2  = nextOfType(events, now, 'ebb');
+    var nd2 = '';
+    if (nextPeak2 && (!nextSlack2 || nextPeak2.t < nextSlack2.t)) {
+      nd2 = 'It peaks at ' + Math.abs(nextPeak2.speed).toFixed(1) + ' kt around ' + fmtTime(nextPeak2.t) +
+            (nextSlack2 ? ', then eases to slack around ' + fmtTime(nextSlack2.t) + '.' : '.');
+    } else if (nextSlack2) {
+      nd2 = 'The ebb is past its peak and easing \u2014 slack arrives around ' + fmtTime(nextSlack2.t) + '.';
+    }
+    phase = (isPast ? 'Ebbed' : 'Ebbing') + ' - ' + abs.toFixed(1) + ' kt';
+    angle = SURF_ANGLE; cls = 'ebb'; label = 'Start: toward ' + SURF_NAME;
+    text  = 'The current ' + WAS + ' ebbing at ' + abs.toFixed(1) + ' knots, ' + PUSHES + ' toward ' + POINT_NAME + '. ' +
+            START + ' swimming toward ' + SURF_NAME + ' (against the current) \u2014 it ' + PUSH + ' push you back toward ' + POINT_NAME + ' on your return. ' + nd2;
+  }
+  return { phase: phase, angle: angle, cls: cls, text: text, label: label };
+}
+
+function renderEvents(events, now) {
+  var cfg        = getStationConfig();
+  var SURF_NAME  = (cfg.surfLabel1 + ' ' + cfg.surfLabel2).trim();
+  var POINT_NAME = (cfg.pointLabel1 + ' ' + cfg.pointLabel2).trim();
+  var el = document.getElementById('events-list');
+  if (!events.length) { el.innerHTML = '<p style="font-size:13px;color:#aaa;">No events found.</p>'; return; }
+  var html = '';
+  for (var i = 0; i < events.length; i++) {
+    var e = events[i], past = e.t < now;
+    var tl = e.type === 'flood' ? 'Flood max' : e.type === 'ebb' ? 'Ebb max' : 'Slack';
+    var sp = e.type === 'slack' ? '--' : Math.abs(e.speed).toFixed(1) + ' kt';
+    var dr = e.type === 'flood' ? 'to ' + SURF_NAME : e.type === 'ebb' ? 'to ' + POINT_NAME : 'no flow';
+    html += '<div class="event-row" style="opacity:' + (past?'0.4':'1') + ';">' +
+      '<span class="event-badge badge-' + e.type + '">' + tl + '</span>' +
+      '<span class="event-time">' + fmtTime(e.t) + '</span>' +
+      '<span class="event-speed">' + sp + '</span>' +
+      '<span class="event-dir">' + dr + '</span></div>';
+  }
+  el.innerHTML = html;
+}
+
+function renderChart(curve, events, now) {
+  document.getElementById('chart-card').style.display = 'block';
+
+  var maxAbs = 0.3;
+  for (var i = 0; i < curve.length; i++) {
+    if (Math.abs(curve[i].v) > maxAbs) maxAbs = Math.abs(curve[i].v);
+  }
+  maxAbs = parseFloat((maxAbs * 1.2).toFixed(1));
+
+  var W = 620, H = 180;
+  var PL = 40, PR = 12, PT = 16, PB = 28;
+  var plotW = W - PL - PR;
+  var plotH = H - PT - PB;
+  var barW  = plotW / curve.length;
+  var midY  = PT + plotH / 2;
+
+  function xBar(i) { return PL + i * barW; }
+  function yVal(v) { return midY - (v / maxAbs) * (plotH / 2); }
+
+  var p = [];
+  p.push('<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 ' + W + ' ' + H + '" style="display:block; overflow:visible;">');
+
+  var gridVals = [maxAbs, maxAbs/2, 0, -maxAbs/2, -maxAbs];
+  for (var g = 0; g < gridVals.length; g++) {
+    var gy   = yVal(gridVals[g]);
+    var gcol = gridVals[g] === 0 ? '#ccc' : '#efefef';
+    var gw   = gridVals[g] === 0 ? '1' : '0.5';
+    p.push('<line x1="' + PL + '" y1="' + gy + '" x2="' + (W-PR) + '" y2="' + gy + '" stroke="' + gcol + '" stroke-width="' + gw + '"/>');
+    var gl = gridVals[g] === 0 ? '0' : (gridVals[g] > 0 ? '+' : '') + gridVals[g].toFixed(1);
+    p.push('<text x="' + (PL-4) + '" y="' + (gy+4) + '" text-anchor="end" font-size="9" fill="#bbb" font-family="sans-serif">' + gl + '</text>');
+  }
+
+  p.push('<text x="10" y="' + (PT+plotH/2) + '" text-anchor="middle" font-size="8" fill="#bbb" font-family="sans-serif" transform="rotate(-90 10 ' + (PT+plotH/2) + ')">knots</text>');
+
+  var nowIdx = 0;
+  for (var i = 0; i < curve.length; i++) {
+    if (Math.abs(curve[i].t - now) < Math.abs(curve[nowIdx].t - now)) nowIdx = i;
+  }
+
+  for (var i = 0; i < curve.length; i++) {
+    var v  = curve[i].v;
+    var bc = i === nowIdx ? '#e67e22' : (v >= 0 ? '#1D9E75' : '#378ADD');
+    var y1 = yVal(v), y2 = midY;
+    if (y1 > y2) { var tmp = y1; y1 = y2; y2 = tmp; }
+    p.push('<rect x="' + (xBar(i)+0.5) + '" y="' + y1 + '" width="' + (barW-1) + '" height="' + Math.max(1,y2-y1) + '" fill="' + bc + '" rx="1"/>');
+  }
+
+  for (var i = 0; i < curve.length; i++) {
+    var h = curve[i].t.getHours(), m = curve[i].t.getMinutes();
+    if (m === 0 && h % 3 === 0) {
+      var lx = xBar(i) + barW / 2;
+      p.push('<text x="' + lx + '" y="' + (H-6) + '" text-anchor="middle" font-size="9" fill="#aaa" font-family="sans-serif">' + fmtTime(curve[i].t) + '</text>');
+      p.push('<line x1="' + lx + '" y1="' + (PT+plotH) + '" x2="' + lx + '" y2="' + (PT+plotH+3) + '" stroke="#ddd" stroke-width="1"/>');
+    }
+  }
+
+  var nowX = xBar(nowIdx) + barW / 2;
+  p.push('<line x1="' + nowX + '" y1="' + PT + '" x2="' + nowX + '" y2="' + (PT+plotH) + '" stroke="#e67e22" stroke-width="2"/>');
+  p.push('<text x="' + (nowX + 3) + '" y="' + (PT + 11) + '" font-size="9" font-weight="bold" fill="#e67e22" font-family="sans-serif">selected time</text>');
+  p.push('</svg>');
+  document.getElementById('chart-svg-wrap').innerHTML = p.join('');
+
+  var WIN    = 3600000;
+  var nowSpd = interpolate(curve, now);
+  var endSpd = interpolate(curve, new Date(now.getTime() + WIN));
+  var trend  = endSpd - nowSpd;
+  var trendTx = Math.abs(trend) < 0.1 ? 'holding steady' :
+                trend > 0 ? 'building +' + trend.toFixed(1) + ' kt over next hour' :
+                            'easing ' + trend.toFixed(1) + ' kt over next hour';
+
+  var pills = '<span class="pill" style="background:#f0f0f0;color:#555;">Now: ' + Math.abs(nowSpd).toFixed(1) + ' kt</span>' +
+              '<span class="pill" style="background:#f0f0f0;color:#555;">+60 min: ' + Math.abs(endSpd).toFixed(1) + ' kt</span>' +
+              '<span class="pill" style="background:#f8f4e8;color:#8a6500;">' + trendTx + '</span>';
+  for (var i = 0; i < events.length; i++) {
+    var e = events[i];
+    if (e.t > now && e.t.getTime() <= now.getTime() + WIN) {
+      var lbl = e.type==='slack' ? 'Slack water' : e.type==='flood' ? 'Peak flood '+Math.abs(e.speed).toFixed(1)+' kt' : 'Peak ebb '+Math.abs(e.speed).toFixed(1)+' kt';
+      var bg  = e.type==='flood' ? '#e1f5ee' : e.type==='ebb' ? '#e6f1fb' : '#f0f0f0';
+      var fg  = e.type==='flood' ? '#0f6e56' : e.type==='ebb' ? '#185fa5' : '#666';
+      pills += '<span class="pill" style="background:'+bg+';color:'+fg+';">'+fmtTime(e.t)+': '+lbl+'</span>';
+    }
+  }
+  document.getElementById('chart-pills').innerHTML = pills;
+}
+
+function updateCompassLabels() {
+  var cfg = getStationConfig();
+  document.getElementById('compass-surf1').textContent  = cfg.surfLabel1;
+  document.getElementById('compass-surf2').textContent  = cfg.surfLabel2;
+  document.getElementById('compass-point1').textContent = cfg.pointLabel1;
+  document.getElementById('compass-point2').textContent = cfg.pointLabel2;
+
+  var s1 = document.getElementById('compass-surf1');
+  var s2 = document.getElementById('compass-surf2');
+  var p1 = document.getElementById('compass-point1');
+  var p2 = document.getElementById('compass-point2');
+  var ax = document.getElementById('compass-axis');
+
+  if (cfg.id === 'SFB1202') {
+    // Flood destination (surf) is EAST = right; ebb destination toward the Gate (point) is WEST = left
+    s1.setAttribute('x','106'); s1.setAttribute('y','57'); s1.setAttribute('text-anchor','middle');
+    s2.setAttribute('x','106'); s2.setAttribute('y','66'); s2.setAttribute('text-anchor','middle');
+    p1.setAttribute('x','14'); p1.setAttribute('y','57'); p1.setAttribute('text-anchor','middle');
+    p2.setAttribute('x','14'); p2.setAttribute('y','66'); p2.setAttribute('text-anchor','middle');
+    ax.setAttribute('x1','8'); ax.setAttribute('y1','60'); ax.setAttribute('x2','112'); ax.setAttribute('y2','60');
+  } else if (cfg.id === 'SFB1203') {
+    // Yellow Bluff: flood ~NNE (13 deg) into Richardson Bay = top; ebb ~SW (211 deg) toward the Gate = lower-left
+    s1.setAttribute('x','70'); s1.setAttribute('y','20'); s1.setAttribute('text-anchor','middle');
+    s2.setAttribute('x','70'); s2.setAttribute('y','29'); s2.setAttribute('text-anchor','middle');
+    p1.setAttribute('x','40'); p1.setAttribute('y','101'); p1.setAttribute('text-anchor','middle');
+    p2.setAttribute('x','40'); p2.setAttribute('y','110'); p2.setAttribute('text-anchor','middle');
+    ax.setAttribute('x1','71'); ax.setAttribute('y1','11'); ax.setAttribute('x2','34'); ax.setAttribute('y2','103');
+  } else {
+    // Raccoon Strait: surf boards NNW, the point SSE
+    s1.setAttribute('x','35'); s1.setAttribute('y','22'); s1.setAttribute('text-anchor','middle');
+    s2.setAttribute('x','35'); s2.setAttribute('y','31'); s2.setAttribute('text-anchor','middle');
+    p1.setAttribute('x','85'); p1.setAttribute('y','97'); p1.setAttribute('text-anchor','middle');
+    p2.setAttribute('x','85'); p2.setAttribute('y','106'); p2.setAttribute('text-anchor','middle');
+    ax.setAttribute('x1','33'); ax.setAttribute('y1','18'); ax.setAttribute('x2','87'); ax.setAttribute('y2','102');
+  }
+}
+
+function updateUI(events, curve, dtStr) {
+  var now   = new Date(dtStr);
+  var speed = interpolate(curve, now);
+  var adv   = buildAdvice(speed, events, now);
+  updateCompassLabels();
+
+  document.getElementById('speed-val').textContent      = Math.abs(speed)<0.05 ? '< 0.1 kt' : Math.abs(speed).toFixed(1)+' kt';
+  document.getElementById('phase-val').textContent      = adv.phase;
+  document.getElementById('swim-arrow').style.transform = 'rotate('+adv.angle+'deg)';
+  document.getElementById('compass-label').textContent  = adv.label;
+
+  var ab = document.getElementById('advice-text');
+  ab.textContent = adv.text;
+  ab.className   = 'advice-box '+adv.cls;
+
+  var pct = Math.min(100, (Math.abs(speed)/MAX_SPEED)*100);
+  var bc  = Math.abs(speed)<0.5?'#999':Math.abs(speed)<1.5?'#e6a817':'#e74c3c';
+  document.getElementById('strength-bar').style.width      = pct+'%';
+  document.getElementById('strength-bar').style.background = bc;
+
+  var lbl = dateLabel(now);
+  document.getElementById('schedule-label').textContent = 'Currents for '+lbl;
+  document.getElementById('chart-label').textContent    = 'Current speed curve - '+lbl;
+
+  renderEvents(events, now);
+  renderChart(curve, events, now);
+}
+
+function loadData() {
+  var dtStr = document.getElementById('swim-dt').value;
+  if (!dtStr) { alert('Please select a date and time first.'); return; }
+
+  document.getElementById('loading-msg').style.display     = 'block';
+  document.getElementById('error-msg').style.display       = 'none';
+  document.getElementById('data-status').style.background  = '#999';
+  document.getElementById('data-status-label').textContent = 'loading...';
+
+  var cfg  = getStationConfig();
+  var dt   = new Date(dtStr);
+  var dp   = dt.getFullYear()+''+ pad(dt.getMonth()+1)+''+ pad(dt.getDate());
+  var base = PROXY+'?station='+cfg.id+'&begin_date='+dp+'&end_date='+dp+'&product=currents_predictions&time_zone=lst_ldt&units=english&format=json';
+
+  var subEl = document.getElementById('widget-subtitle');
+  if (cfg.id === 'SFB1212') {
+    subEl.textContent = 'Raccoon Strait \u00b7 Station SFB1212 \u00b7 Paradise Beach Park, Tiburon';
+  } else if (cfg.id === 'SFB1202') {
+    subEl.textContent = 'Crissy Field \u00b7 Station SFB1202 (Golden Gate Bridge PORTS)';
+  } else if (cfg.id === 'SFB1203') {
+    subEl.textContent = 'Yellow Bluff \u00b7 nearest live station SFB1203 (Golden Gate Bridge, 0.46 nm E of)';
+  } else {
+    subEl.textContent = cfg.name + ' \u00b7 Station ' + cfg.id;
+  }
+
+  Promise.all([
+    fetch(base+'&interval=MAX_SLACK').then(function(r){return r.json();}),
+    fetch(base+'&interval=h').then(function(r){return r.json();})
+  ]).then(function(results) {
+    var rawEv  = (results[0].current_predictions&&results[0].current_predictions.cp)?results[0].current_predictions.cp:[];
+    var rawCrv = (results[1].current_predictions&&results[1].current_predictions.cp)?results[1].current_predictions.cp:[];
+    if (!rawEv.length) throw new Error('No events returned from NOAA');
+    var events = rawEv.map(function(e) {
+      var v = parseFloat(e.Velocity_Major);
+      var rawType = (e.Type || '').toLowerCase();
+      var evType = rawType.indexOf('slack') >= 0 ? 'slack' :
+                   rawType.indexOf('flood') >= 0 ? 'flood' :
+                   rawType.indexOf('ebb')   >= 0 ? 'ebb'   :
+                   v > 0 ? 'flood' : v < 0 ? 'ebb' : 'slack';
+      return {t:new Date(e.Time), type:evType, speed:v};
+    });
+    var curve = rawCrv.map(function(e) { return {t:new Date(e.Time), v:parseFloat(e.Velocity_Major)}; });
+    document.getElementById('loading-msg').style.display     = 'none';
+    document.getElementById('data-status').style.background  = '#1D9E75';
+    document.getElementById('data-status-label').textContent = 'Live NOAA data';
+    updateUI(events, curve, dtStr);
+  }).catch(function(err) {
+    document.getElementById('loading-msg').style.display     = 'none';
+    document.getElementById('data-status').style.background  = '#e74c3c';
+    document.getElementById('data-status-label').textContent = 'Could not load data';
+    document.getElementById('error-msg').textContent = 'Could not load NOAA data: '+err.message;
+    document.getElementById('error-msg').style.display       = 'block';
+  });
+}
+
+initDateTime();
+loadData();
+</script>
+</body>
+</html>
