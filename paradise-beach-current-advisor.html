@@ -267,6 +267,7 @@
     <p class="msg" id="opp-loading" style="display:none;">Scanning predictions&hellip;</p>
     <p class="msg error" id="opp-error" style="display:none;"></p>
     <p class="msg note" id="opp-note" style="display:none;"></p>
+    <p class="msg" id="opp-source" style="display:none;"></p>
 
     <div class="card">
       <p class="section-label">Routes &amp; conditions</p>
@@ -861,7 +862,9 @@ function cmpLoadData() {
 
 /* ---- editable tuning ---- */
 var OPP_TIDE_STATION  = '9414817';      // Angel Island (west side) — tide-height gauge at Raccoon Strait
-var OPP_TIDE_FALLBACK = '9414290';      // San Francisco — used only if the Angel Island gauge isn't served by the API
+var OPP_TIDE_FALLBACK = '9414290';      // San Francisco — used if the Angel Island gauge isn't available
+var OPP_TIDE_API = 'https://api.tidesandcurrents.noaa.gov/api/prod/datagetter'; // pull tide DIRECTLY from NOAA (bypasses the proxy)
+var oppTideSource = '', oppTideHighs = 0; // diagnostics: which source provided the tide, and how many highs it returned
 var OPP_LAT = 37.83, OPP_LNG = -122.45; // SF Bay point used for sunrise
 var OPP_LIGHT   = 0.5;   // kt — "slack / light" ceiling (Angel Island Row; Raccoon "slack" for Belvedere)
 var OPP_STRONG  = 1.5;   // kt — "strong" flood/ebb at Crissy sunrisers
@@ -939,19 +942,32 @@ function oppFetchCurrent(id, startMs, endMs) {
       return cp.map(function(e){ return { t:new Date(e.Time), v:parseFloat(e.Velocity_Major) }; }); },
     startMs, endMs);
 }
-function oppFetchTideFor(station, startMs, endMs) {
+// Tide sources tried in order: NOAA direct first (no proxy), then the proxy as a backstop.
+function oppTideAttempts() {
+  return [
+    { label:'Angel Island gauge, direct from NOAA',  base:OPP_TIDE_API, station:OPP_TIDE_STATION },
+    { label:'San Francisco gauge, direct from NOAA', base:OPP_TIDE_API, station:OPP_TIDE_FALLBACK },
+    { label:'Angel Island gauge, via proxy',         base:PROXY,        station:OPP_TIDE_STATION },
+    { label:'San Francisco gauge, via proxy',        base:PROXY,        station:OPP_TIDE_FALLBACK }
+  ];
+}
+function oppFetchTideAttempt(a, startMs, endMs) {
   return oppFetchRange(
-    function(b,e){ return PROXY+'?station='+station+'&begin_date='+b+'&end_date='+e+
-      '&product=predictions&datum=MLLW&time_zone=lst_ldt&units=english&format=json&interval=hilo'; },
+    function(b,e){ return a.base+'?station='+a.station+'&begin_date='+b+'&end_date='+e+
+      '&product=predictions&datum=MLLW&time_zone=lst_ldt&units=english&interval=hilo&format=json&application=mows'; },
     function(j){ var pr=j.predictions||[];
-      if(!pr.length) throw new Error('no tide data '+station);
-      return pr.map(function(e){ return { t:new Date(e.t), v:parseFloat(e.v), type:e.type }; }); },
+      if(!pr.length) throw new Error('no tide data');
+      return pr.map(function(e){ return { t:new Date(e.t.replace(' ','T')), v:parseFloat(e.v), type:e.type }; }); },
     startMs, endMs);
 }
+function oppTryTide(attempts, idx, startMs, endMs) {
+  if (idx >= attempts.length) return Promise.reject(new Error('all tide sources failed'));
+  return oppFetchTideAttempt(attempts[idx], startMs, endMs)
+    .then(function(arr){ oppTideSource = attempts[idx].label; return arr; })
+    .catch(function(){ return oppTryTide(attempts, idx+1, startMs, endMs); });
+}
 function oppFetchTide(startMs, endMs) {
-  return oppFetchTideFor(OPP_TIDE_STATION, startMs, endMs).catch(function(){
-    return oppFetchTideFor(OPP_TIDE_FALLBACK, startMs, endMs);   // Angel Island unavailable -> use San Francisco
-  });
+  return oppTryTide(oppTideAttempts(), 0, startMs, endMs);
 }
 
 /* ---- evaluation ---- */
@@ -1053,6 +1069,7 @@ function oppScan() {
   document.getElementById('opp-loading').style.display='block';
   document.getElementById('opp-error').style.display='none';
   document.getElementById('opp-note').style.display='none';
+  document.getElementById('opp-source').style.display='none';
 
   oppRenderKey();
 
@@ -1065,6 +1082,11 @@ function oppScan() {
     document.getElementById('opp-loading').style.display='none';
     var curves={ SFB1212:res[0], SFB1202:res[1], SFB1203:res[2] };
     var results=oppEvaluate(curves, res[3], startMs, days, weekendsOnly);
+    oppTideHighs = res[3].filter(function(e){ return e.type==='H'; }).length;
+    var belv = results.filter(function(r){ return r.hits.some(function(h){ return h.key==='belvedere'; }); }).length;
+    var src=document.getElementById('opp-source');
+    src.textContent='Tide data: '+oppTideSource+' \u2014 '+oppTideHighs+' high tides loaded; '+belv+' meet the 5 ft / 7am\u20131pm rule.';
+    src.style.display='block';
     oppRenderResults(results, weeks);
   }).catch(function(err){
     document.getElementById('opp-loading').style.display='none';
@@ -1077,6 +1099,9 @@ function oppScan() {
       'The tide check also needs the proxy to allow the &ldquo;predictions&rdquo; product; if this tab alone stays on demo after deploy, that\u2019s the likely cause. '+
       'Belvedere matches depend on a real high-tide-near-8am alignment and may not appear in demo data.';
     note.style.display='block';
+    var src3=document.getElementById('opp-source');
+    src3.textContent='Tide data: demo (no live source reachable).';
+    src3.style.display='block';
     oppRenderResults(results, weeks);
   });
 }
