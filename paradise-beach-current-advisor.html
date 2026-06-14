@@ -21,7 +21,7 @@
     .status-label { font-size: 12px; color: #888; }
     .controls { display: flex; gap: 10px; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
     .controls label { font-size: 13px; color: #555; white-space: nowrap; }
-    .controls input[type="datetime-local"] {
+    .controls input[type="datetime-local"], .controls input[type="date"] {
       flex: 1; min-width: 180px; font-size: 14px; padding: 7px 10px;
       border: 1px solid #ddd; border-radius: 8px; background: #fafafa; color: #1a1a1a;
     }
@@ -36,6 +36,7 @@
     .controls button:hover { background: #155a9a; }
     .msg { font-size: 13px; color: #888; padding: .4rem 0; }
     .msg.error { color: #c0392b; }
+    .msg.note { color: #8a6500; background: #f8f4e8; padding: .5rem .75rem; border-radius: 8px; }
     .metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 1rem; }
     .metric-card { background: #f8f8f8; border-radius: 10px; padding: .75rem 1rem; text-align: center; }
     .metric-label { font-size: 11px; color: #888; margin-bottom: 4px; text-transform: uppercase; letter-spacing: .05em; }
@@ -72,10 +73,45 @@
     .legend { display: flex; gap: 16px; font-size: 12px; color: #888; margin-bottom: 8px; flex-wrap: wrap; }
     .legend span { display: flex; align-items: center; gap: 4px; }
     .legend-dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+    .legend-swatch { width: 16px; height: 3px; border-radius: 2px; display: inline-block; }
     .pills { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 8px; }
     .pill { font-size: 11px; padding: 3px 8px; border-radius: 4px; }
     .noaa-credit { font-size: 11px; color: #bbb; text-align: center; margin-top: 1rem; }
     .noaa-credit a { color: #bbb; }
+
+    /* --- tabs --- */
+    .tabs { display: flex; gap: 2px; margin-bottom: 1rem; border-bottom: 1px solid #eee; }
+    .tab-btn {
+      font-size: 13px; font-weight: 600; padding: 8px 16px; border: none; background: none;
+      color: #999; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px;
+    }
+    .tab-btn:hover { color: #555; }
+    .tab-btn.active { color: #1a6fba; border-bottom-color: #1a6fba; }
+
+    /* --- comparison timing table --- */
+    table.timing { width: 100%; border-collapse: collapse; font-size: 13px; }
+    table.timing th { text-align: left; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .04em; font-weight: 500; padding: 4px 8px; border-bottom: 1px solid #eee; }
+    table.timing td { padding: 7px 8px; border-bottom: 1px solid #f2f2f2; color: #1a1a1a; }
+    table.timing tr:last-child td { border-bottom: none; }
+    .st-name { display: flex; align-items: center; gap: 7px; font-weight: 500; }
+    .st-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+    .delta { color: #888; font-size: 12px; }
+
+    /* --- opportunistic dates --- */
+    .opp-controls label.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: #555; }
+    .opp-key .krow { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; color: #666; padding: 4px 0; line-height: 1.45; }
+    .opp-key .krow .st-dot { margin-top: 4px; flex: none; }
+    .opp-key b { color: #1a1a1a; }
+    .opp-day { display: flex; gap: 14px; padding: .7rem 0; border-bottom: 1px solid #f0f0f0; align-items: flex-start; }
+    .opp-day:last-child { border-bottom: none; }
+    .opp-date { min-width: 96px; font-weight: 600; font-size: 13px; color: #1a1a1a; padding-top: 1px; }
+    .opp-date .dow { color: #1a6fba; }
+    .opp-routes { flex: 1; display: flex; flex-direction: column; gap: 7px; }
+    .route-line { font-size: 13px; color: #444; line-height: 1.45; display: flex; gap: 8px; align-items: flex-start; }
+    .route-line .st-dot { margin-top: 5px; flex: none; }
+    .route-name { font-weight: 600; color: #1a1a1a; }
+    .opp-empty { font-size: 13px; color: #aaa; padding: .5rem 0; }
+    .opp-summary { font-size: 12px; color: #888; margin-bottom: 4px; }
   </style>
 </head>
 <body>
@@ -88,84 +124,161 @@
     <span class="status-label" id="data-status-label">loading&hellip;</span>
   </div>
 
-  <div class="controls">
-    <label for="swim-dt">Swim date &amp; time</label>
-    <input type="datetime-local" id="swim-dt" />
-    <select id="station-select" onchange="loadData()" style="font-size:13px; padding:7px 10px; border:1px solid #ddd; border-radius:8px; background:#fafafa; color:#1a1a1a; cursor:pointer;">
-      <option value="SFB1212" data-name="Raccoon Strait" data-surf="330" data-point="150" data-surflabel1="surf" data-surflabel2="boards" data-pointlabel1="the" data-pointlabel2="point">Raccoon Strait (default)</option>
-      <option value="SFB1202" data-name="Crissy Field" data-surf="80" data-point="260" data-surflabel1="Alcatraz" data-surflabel2="" data-pointlabel1="Golden Gate" data-pointlabel2="Bridge">Crissy Field - Golden Gate Bridge</option>
-      <option value="SFB1203" data-name="Yellow Bluff" data-surf="13" data-point="211" data-surflabel1="Richardson" data-surflabel2="Bay" data-pointlabel1="Golden Gate" data-pointlabel2="Bridge">Yellow Bluff</option>
-    </select>
-    <button onclick="loadData()">Load currents</button>
+  <div class="tabs">
+    <button class="tab-btn active" id="tabbtn-advisor" onclick="switchTab('advisor')">Swim advisor</button>
+    <button class="tab-btn" id="tabbtn-compare" onclick="switchTab('compare')">Compare stations</button>
+    <button class="tab-btn" id="tabbtn-opp" onclick="switchTab('opp')">Opportunistic dates</button>
   </div>
 
-  <p class="msg" id="loading-msg" style="display:none;">Fetching NOAA data&hellip;</p>
-  <p class="msg error" id="error-msg" style="display:none;"></p>
+  <!-- ============================ ADVISOR TAB ============================ -->
+  <div id="tab-advisor">
 
-  <div class="metrics">
-    <div class="metric-card">
-      <p class="metric-label">Current speed</p>
-      <p class="metric-value" id="speed-val">&mdash;</p>
-    </div>
-    <div class="metric-card">
-      <p class="metric-label">Phase</p>
-      <p class="metric-value" id="phase-val" style="font-size:15px; padding-top:4px;">&mdash;</p>
-    </div>
-  </div>
-
-  <div class="main-grid">
-    <div class="compass-card">
-      <p class="compass-section-label">Start swimming</p>
-      <svg viewBox="0 0 120 120" width="130" height="130" role="img" aria-label="Compass showing recommended swim start direction">
-        <circle cx="60" cy="60" r="56" fill="none" stroke="#e8e8e8" stroke-width="1.5"/>
-        <circle cx="60" cy="60" r="52" fill="#f8f8f8"/>
-        <text x="60" y="13"  text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">N</text>
-        <text x="60" y="114" text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">S</text>
-        <text x="9"  y="64"  text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">W</text>
-        <text x="111" y="64" text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">E</text>
-        <text id="compass-surf1"  x="35" y="22"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">surf</text>
-        <text id="compass-surf2"  x="35" y="31"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">boards</text>
-        <text id="compass-point1" x="85" y="97"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">the</text>
-        <text id="compass-point2" x="85" y="106" text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">point</text>
-        <line id="compass-axis" x1="33" y1="18" x2="87" y2="102" stroke="#ddd" stroke-width="1" stroke-dasharray="3,3"/>
-        <g id="swim-arrow" style="transform-origin:60px 60px; transform:rotate(0deg); transition:transform .8s ease;">
-          <polygon points="60,20 67,48 60,43 53,48" fill="#1D9E75" opacity="0.95"/>
-          <polygon points="60,100 67,72 60,77 53,72" fill="#1D9E75" opacity="0.2"/>
-          <line x1="60" y1="28" x2="60" y2="92" stroke="#1D9E75" stroke-width="1.5" opacity="0.35"/>
-        </g>
-        <circle cx="60" cy="60" r="5" fill="#fff" stroke="#ddd" stroke-width="1"/>
-      </svg>
-      <p class="compass-label" id="compass-label">Select a time</p>
+    <div class="controls">
+      <label for="swim-dt">Swim date &amp; time</label>
+      <input type="datetime-local" id="swim-dt" />
+      <select id="station-select" onchange="loadData()" style="font-size:13px; padding:7px 10px; border:1px solid #ddd; border-radius:8px; background:#fafafa; color:#1a1a1a; cursor:pointer;">
+        <option value="SFB1212" data-name="Raccoon Strait" data-surf="330" data-point="150" data-surflabel1="surf" data-surflabel2="boards" data-pointlabel1="the" data-pointlabel2="point">Raccoon Strait (default)</option>
+        <option value="SFB1202" data-name="Crissy Field" data-surf="80" data-point="260" data-surflabel1="Alcatraz" data-surflabel2="" data-pointlabel1="Golden Gate" data-pointlabel2="Bridge">Crissy Field - Golden Gate Bridge</option>
+      </select>
+      <button onclick="loadData()">Load currents</button>
     </div>
 
-    <div class="advice-col">
-      <div>
-        <p class="section-label">Swim advice</p>
-        <div class="advice-box" id="advice-text">Select a date and time above, then click "Load currents" for your swim recommendation.</div>
+    <p class="msg" id="loading-msg" style="display:none;">Fetching NOAA data&hellip;</p>
+    <p class="msg error" id="error-msg" style="display:none;"></p>
+
+    <div class="metrics">
+      <div class="metric-card">
+        <p class="metric-label">Current speed</p>
+        <p class="metric-value" id="speed-val">&mdash;</p>
       </div>
-      <div>
-        <p class="section-label">Current strength</p>
-        <div class="strength-bar-bg"><div class="strength-bar-fill" id="strength-bar"></div></div>
-        <div class="strength-labels"><span>Slack</span><span>Moderate</span><span>Strong</span></div>
+      <div class="metric-card">
+        <p class="metric-label">Phase</p>
+        <p class="metric-value" id="phase-val" style="font-size:15px; padding-top:4px;">&mdash;</p>
       </div>
     </div>
-  </div>
 
-  <div class="card" id="chart-card" style="display:none;">
-    <p class="section-label" id="chart-label">Current speed curve</p>
-    <div class="legend">
-      <span><span class="legend-dot" style="background:#1D9E75;"></span> Flood</span>
-      <span><span class="legend-dot" style="background:#378ADD;"></span> Ebb</span>
-      <span><span class="legend-dot" style="background:#e67e22;"></span> Selected time</span>
+    <div class="main-grid">
+      <div class="compass-card">
+        <p class="compass-section-label">Start swimming</p>
+        <svg viewBox="0 0 120 120" width="130" height="130" role="img" aria-label="Compass showing recommended swim start direction">
+          <circle cx="60" cy="60" r="56" fill="none" stroke="#e8e8e8" stroke-width="1.5"/>
+          <circle cx="60" cy="60" r="52" fill="#f8f8f8"/>
+          <text x="60" y="13"  text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">N</text>
+          <text x="60" y="114" text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">S</text>
+          <text x="9"  y="64"  text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">W</text>
+          <text x="111" y="64" text-anchor="middle" font-size="10" fill="#aaa" font-family="sans-serif">E</text>
+          <text id="compass-surf1"  x="35" y="22"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">surf</text>
+          <text id="compass-surf2"  x="35" y="31"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">boards</text>
+          <text id="compass-point1" x="85" y="97"  text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">the</text>
+          <text id="compass-point2" x="85" y="106" text-anchor="middle" font-size="7" fill="#888" font-family="sans-serif">point</text>
+          <line id="compass-axis" x1="33" y1="18" x2="87" y2="102" stroke="#ddd" stroke-width="1" stroke-dasharray="3,3"/>
+          <g id="swim-arrow" style="transform-origin:60px 60px; transform:rotate(0deg); transition:transform .8s ease;">
+            <polygon points="60,20 67,48 60,43 53,48" fill="#1D9E75" opacity="0.95"/>
+            <polygon points="60,100 67,72 60,77 53,72" fill="#1D9E75" opacity="0.2"/>
+            <line x1="60" y1="28" x2="60" y2="92" stroke="#1D9E75" stroke-width="1.5" opacity="0.35"/>
+          </g>
+          <circle cx="60" cy="60" r="5" fill="#fff" stroke="#ddd" stroke-width="1"/>
+        </svg>
+        <p class="compass-label" id="compass-label">Select a time</p>
+      </div>
+
+      <div class="advice-col">
+        <div>
+          <p class="section-label">Swim advice</p>
+          <div class="advice-box" id="advice-text">Select a date and time above, then click "Load currents" for your swim recommendation.</div>
+        </div>
+        <div>
+          <p class="section-label">Current strength</p>
+          <div class="strength-bar-bg"><div class="strength-bar-fill" id="strength-bar"></div></div>
+          <div class="strength-labels"><span>Slack</span><span>Moderate</span><span>Strong</span></div>
+        </div>
+      </div>
     </div>
-    <div id="chart-svg-wrap"></div>
-    <div class="pills" id="chart-pills"></div>
-  </div>
 
-  <div class="card">
-    <p class="section-label" id="schedule-label">Current schedule</p>
-    <div id="events-list"><p style="font-size:13px;color:#aaa;">Load currents to see the schedule.</p></div>
-  </div>
+    <div class="card" id="chart-card" style="display:none;">
+      <p class="section-label" id="chart-label">Current speed curve</p>
+      <div class="legend">
+        <span><span class="legend-dot" style="background:#1D9E75;"></span> Flood</span>
+        <span><span class="legend-dot" style="background:#378ADD;"></span> Ebb</span>
+        <span><span class="legend-dot" style="background:#e67e22;"></span> Selected time</span>
+      </div>
+      <div id="chart-svg-wrap"></div>
+      <div class="pills" id="chart-pills"></div>
+    </div>
+
+    <div class="card">
+      <p class="section-label" id="schedule-label">Current schedule</p>
+      <div id="events-list"><p style="font-size:13px;color:#aaa;">Load currents to see the schedule.</p></div>
+    </div>
+
+  </div><!-- /tab-advisor -->
+
+  <!-- ============================ COMPARE TAB ============================ -->
+  <div id="tab-compare" style="display:none;">
+
+    <div class="controls">
+      <label for="cmp-start-date">Start date</label>
+      <input type="date" id="cmp-start-date" />
+      <label for="cmp-days-select">Span</label>
+      <select id="cmp-days-select" onchange="cmpLoadData()">
+        <option value="1">1 day</option>
+        <option value="2" selected>2 days</option>
+        <option value="3">3 days</option>
+      </select>
+      <button onclick="cmpLoadData()">Load currents</button>
+    </div>
+
+    <p class="msg error" id="cmp-error-msg" style="display:none;"></p>
+    <p class="msg note" id="cmp-demo-note" style="display:none;"></p>
+
+    <div class="card">
+      <p class="section-label">Current speed by station &mdash; flood (above) vs ebb (below)</p>
+      <div class="legend" id="cmp-legend"></div>
+      <div id="cmp-chart-svg-wrap"></div>
+    </div>
+
+    <div class="card">
+      <p class="section-label">Peak timing by station (first day)</p>
+      <table class="timing">
+        <thead>
+          <tr><th>Station</th><th>Peak flood</th><th>Peak ebb</th><th>Shift vs Raccoon</th></tr>
+        </thead>
+        <tbody id="cmp-timing-body"></tbody>
+      </table>
+    </div>
+
+  </div><!-- /tab-compare -->
+
+  <!-- ======================== OPPORTUNISTIC DATES TAB ======================== -->
+  <div id="tab-opp" style="display:none;">
+
+    <div class="controls opp-controls">
+      <label for="opp-weeks">Look ahead</label>
+      <select id="opp-weeks" onchange="oppScan()">
+        <option value="4">4 weeks</option>
+        <option value="6" selected>6 weeks</option>
+        <option value="8">8 weeks</option>
+        <option value="12">12 weeks</option>
+      </select>
+      <label class="chk"><input type="checkbox" id="opp-weekends" checked onchange="oppScan()" style="cursor:pointer;"> Weekends only</label>
+      <button onclick="oppScan()">Find dates</button>
+    </div>
+
+    <p class="msg" id="opp-loading" style="display:none;">Scanning predictions&hellip;</p>
+    <p class="msg error" id="opp-error" style="display:none;"></p>
+    <p class="msg note" id="opp-note" style="display:none;"></p>
+
+    <div class="card">
+      <p class="section-label">Routes &amp; conditions</p>
+      <div class="opp-key" id="opp-key"></div>
+    </div>
+
+    <div class="card">
+      <p class="section-label" id="opp-results-label">Matching dates</p>
+      <div id="opp-results"><p class="opp-empty">Click &ldquo;Find dates&rdquo; to scan upcoming predictions.</p></div>
+    </div>
+
+  </div><!-- /tab-opp -->
 
   <p class="noaa-credit">
     Current predictions from <a href="https://tidesandcurrents.noaa.gov" target="_blank">NOAA Tides &amp; Currents</a> &middot; Not for navigation
@@ -446,19 +559,12 @@ function updateCompassLabels() {
   var ax = document.getElementById('compass-axis');
 
   if (cfg.id === 'SFB1202') {
-    // Flood destination (surf) is EAST = right; ebb destination toward the Gate (point) is WEST = left
+    // Alcatraz (surf, flood destination) is EAST = right; GGB (point, start when flooding) is WEST = left
     s1.setAttribute('x','106'); s1.setAttribute('y','57'); s1.setAttribute('text-anchor','middle');
     s2.setAttribute('x','106'); s2.setAttribute('y','66'); s2.setAttribute('text-anchor','middle');
     p1.setAttribute('x','14'); p1.setAttribute('y','57'); p1.setAttribute('text-anchor','middle');
     p2.setAttribute('x','14'); p2.setAttribute('y','66'); p2.setAttribute('text-anchor','middle');
     ax.setAttribute('x1','8'); ax.setAttribute('y1','60'); ax.setAttribute('x2','112'); ax.setAttribute('y2','60');
-  } else if (cfg.id === 'SFB1203') {
-    // Yellow Bluff: flood ~NNE (13 deg) into Richardson Bay = top; ebb ~SW (211 deg) toward the Gate = lower-left
-    s1.setAttribute('x','70'); s1.setAttribute('y','20'); s1.setAttribute('text-anchor','middle');
-    s2.setAttribute('x','70'); s2.setAttribute('y','29'); s2.setAttribute('text-anchor','middle');
-    p1.setAttribute('x','40'); p1.setAttribute('y','101'); p1.setAttribute('text-anchor','middle');
-    p2.setAttribute('x','40'); p2.setAttribute('y','110'); p2.setAttribute('text-anchor','middle');
-    ax.setAttribute('x1','71'); ax.setAttribute('y1','11'); ax.setAttribute('x2','34'); ax.setAttribute('y2','103');
   } else {
     // Raccoon Strait: surf boards NNW, the point SSE
     s1.setAttribute('x','35'); s1.setAttribute('y','22'); s1.setAttribute('text-anchor','middle');
@@ -516,8 +622,6 @@ function loadData() {
     subEl.textContent = 'Raccoon Strait \u00b7 Station SFB1212 \u00b7 Paradise Beach Park, Tiburon';
   } else if (cfg.id === 'SFB1202') {
     subEl.textContent = 'Crissy Field \u00b7 Station SFB1202 (Golden Gate Bridge PORTS)';
-  } else if (cfg.id === 'SFB1203') {
-    subEl.textContent = 'Yellow Bluff \u00b7 nearest live station SFB1203 (Golden Gate Bridge, 0.46 nm E of)';
   } else {
     subEl.textContent = cfg.name + ' \u00b7 Station ' + cfg.id;
   }
@@ -550,6 +654,436 @@ function loadData() {
     document.getElementById('error-msg').textContent = 'Could not load NOAA data: '+err.message;
     document.getElementById('error-msg').style.display       = 'block';
   });
+}
+
+/* ====================================================================== */
+/* ==================== COMPARE-STATIONS TAB (namespaced) =============== */
+/* ====================================================================== */
+
+var CMP_STATIONS = [
+  { id:'SFB1212', name:'Raccoon Strait', sub:'Paradise Beach',          color:'#1D9E75', ref:true,
+    amp:0.95, phaseMin:0,   diurnal:0.22 },
+  { id:'SFB1202', name:'Crissy Field',   sub:'Golden Gate Bridge',      color:'#1a6fba',
+    amp:3.40, phaseMin:-35, diurnal:0.16 },
+  { id:'SFB1203', name:'Yellow Bluff',   sub:'GG Bridge, 0.46 nm E',    color:'#e67e22',
+    amp:2.75, phaseMin:-22, diurnal:0.28 }
+];
+
+var CMP_DAY = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var CMP_MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var cmpLoaded = false;
+
+function cmpFmtDate(t) { return CMP_DAY[t.getDay()] + ' ' + CMP_MON[t.getMonth()] + ' ' + t.getDate(); }
+
+function cmpInitDate() {
+  var sat = getUpcomingSaturday();
+  document.getElementById('cmp-start-date').value =
+    sat.getFullYear() + '-' + pad(sat.getMonth()+1) + '-' + pad(sat.getDate());
+}
+
+/* offline fallback: synthesize a believable semidiurnal curve */
+function cmpDemoCurve(st, t0ms, days) {
+  var Tm2 = 12.42*3600e3, Tk1 = 23.93*3600e3;
+  var wm = 2*Math.PI/Tm2, wk = 2*Math.PI/Tk1;
+  var ph = st.phaseMin*60e3, BASE = -2*3600e3;
+  var pts = [];
+  for (var ms = 0; ms <= days*24*3600e3; ms += 10*60e3) {
+    var x  = ms - ph + BASE;
+    var a  = Math.cos(wm*x + Math.PI);
+    var di = st.diurnal*Math.cos(wk*x + Math.PI);
+    pts.push({ t:new Date(t0ms+ms), v:st.amp*(a+di) });
+  }
+  return pts;
+}
+
+function cmpFindPeaks(curve, dayEndMs) {
+  var maxV=-1e9, minV=1e9, maxT=null, minT=null;
+  for (var i=0;i<curve.length;i++) {
+    if (curve[i].t.getTime() > dayEndMs) break;
+    if (curve[i].v > maxV) { maxV=curve[i].v; maxT=curve[i].t; }
+    if (curve[i].v < minV) { minV=curve[i].v; minT=curve[i].t; }
+  }
+  return { floodT:maxT, floodV:maxV, ebbT:minT, ebbV:minV };
+}
+
+function cmpSignedMinutes(a, b) {
+  if (!a || !b) return null;
+  return Math.round((a.getTime()-b.getTime())/60000);
+}
+function cmpFmtDelta(min) {
+  if (min === null) return '\u2014';
+  if (min === 0) return 'same time';
+  var sign = min < 0 ? '\u2212' : '+';
+  var abs = Math.abs(min);
+  var h = Math.floor(abs/60), m = abs % 60;
+  var s = h > 0 ? (h+'h '+pad(m)+'m') : (abs+' min');
+  return sign + s + (min < 0 ? ' earlier' : ' later');
+}
+
+function cmpSmoothPath(pts) {
+  if (pts.length < 2) return '';
+  var d = 'M'+pts[0].x.toFixed(1)+' '+pts[0].y.toFixed(1);
+  for (var i=0;i<pts.length-1;i++) {
+    var p0=pts[i-1]||pts[i], p1=pts[i], p2=pts[i+1], p3=pts[i+2]||p2;
+    var c1x=p1.x+(p2.x-p0.x)/6, c1y=p1.y+(p2.y-p0.y)/6;
+    var c2x=p2.x-(p3.x-p1.x)/6, c2y=p2.y-(p3.y-p1.y)/6;
+    d += ' C'+c1x.toFixed(1)+' '+c1y.toFixed(1)+' '+c2x.toFixed(1)+' '+c2y.toFixed(1)+
+         ' '+p2.x.toFixed(1)+' '+p2.y.toFixed(1);
+  }
+  return d;
+}
+
+function cmpRenderChart(series, t0ms, days) {
+  var W=640, H=300, PL=40, PR=14, PT=24, PB=40;
+  var plotW=W-PL-PR, plotH=H-PT-PB, midY=PT+plotH/2;
+  var spanMs=days*24*3600e3;
+
+  var maxAbs=0.5;
+  for (var s=0;s<series.length;s++)
+    for (var i=0;i<series[s].curve.length;i++)
+      if (Math.abs(series[s].curve[i].v) > maxAbs) maxAbs = Math.abs(series[s].curve[i].v);
+  maxAbs = Math.ceil(maxAbs*1.15*2)/2;
+
+  function xT(t) { return PL + ((t.getTime()-t0ms)/spanMs)*plotW; }
+  function yV(v) { return midY - (v/maxAbs)*(plotH/2); }
+
+  var p=[];
+  p.push('<svg xmlns="http://www.w3.org/2000/svg" width="100%" viewBox="0 0 '+W+' '+H+'" style="display:block;overflow:visible;">');
+
+  var steps=[];
+  for (var g=maxAbs; g>=-maxAbs+0.001; g-=maxAbs/2) steps.push(parseFloat(g.toFixed(2)));
+  for (var gi=0;gi<steps.length;gi++) {
+    var gv=steps[gi], gy=yV(gv), zero=Math.abs(gv)<0.001;
+    p.push('<line x1="'+PL+'" y1="'+gy.toFixed(1)+'" x2="'+(W-PR)+'" y2="'+gy.toFixed(1)+
+           '" stroke="'+(zero?'#bbb':'#efefef')+'" stroke-width="'+(zero?1:0.5)+'"/>');
+    var lbl=zero?'0':(gv>0?'+':'')+gv.toFixed(1);
+    p.push('<text x="'+(PL-6)+'" y="'+(gy+3.5).toFixed(1)+'" text-anchor="end" font-size="9" fill="#bbb" font-family="sans-serif">'+lbl+'</text>');
+  }
+  p.push('<text x="11" y="'+midY+'" text-anchor="middle" font-size="9" fill="#aaa" font-family="sans-serif" transform="rotate(-90 11 '+midY+')">knots</text>');
+
+  p.push('<text x="'+(PL+plotW/2)+'" y="'+(PT+13)+'" text-anchor="middle" font-size="13" font-weight="600" fill="#dcdcdc" font-family="sans-serif" letter-spacing="2">FLOOD</text>');
+  p.push('<text x="'+(PL+plotW/2)+'" y="'+(PT+plotH-6)+'" text-anchor="middle" font-size="13" font-weight="600" fill="#dcdcdc" font-family="sans-serif" letter-spacing="2">EBB</text>');
+
+  for (var hh=0; hh<=days*24; hh+=6) {
+    var t=new Date(t0ms+hh*3600e3), x=xT(t), midnight=(t.getHours()===0);
+    p.push('<line x1="'+x.toFixed(1)+'" y1="'+PT+'" x2="'+x.toFixed(1)+'" y2="'+(PT+plotH)+
+           '" stroke="'+(midnight?'#e6e6e6':'#f4f4f4')+'" stroke-width="'+(midnight?1:0.5)+'"/>');
+    if (hh<days*24) {
+      p.push('<text x="'+(x+2).toFixed(1)+'" y="'+(H-22)+'" text-anchor="middle" font-size="9" fill="#aaa" font-family="sans-serif">'+fmtTime(t)+'</text>');
+      if (midnight)
+        p.push('<text x="'+(x+2).toFixed(1)+'" y="'+(H-9)+'" text-anchor="middle" font-size="9" font-weight="600" fill="#999" font-family="sans-serif">'+cmpFmtDate(t)+'</text>');
+    }
+  }
+
+  for (var s=0;s<series.length;s++) {
+    var pix=series[s].curve.map(function(d){ return { x:xT(d.t), y:yV(d.v) }; });
+    p.push('<path d="'+cmpSmoothPath(pix)+'" fill="none" stroke="'+series[s].st.color+
+           '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.92"/>');
+  }
+
+  p.push('</svg>');
+  document.getElementById('cmp-chart-svg-wrap').innerHTML = p.join('');
+}
+
+function cmpRenderLegend() {
+  var html='';
+  for (var s=0;s<CMP_STATIONS.length;s++)
+    html += '<span><span class="legend-swatch" style="background:'+CMP_STATIONS[s].color+';"></span>'+CMP_STATIONS[s].name+'</span>';
+  document.getElementById('cmp-legend').innerHTML = html;
+}
+
+function cmpRenderTiming(series, dayEndMs) {
+  var ref=null;
+  for (var s=0;s<series.length;s++) if (series[s].st.ref) ref=cmpFindPeaks(series[s].curve, dayEndMs);
+  var html='';
+  for (var s=0;s<series.length;s++) {
+    var st=series[s].st, pk=cmpFindPeaks(series[s].curve, dayEndMs);
+    var df=ref?cmpSignedMinutes(pk.floodT, ref.floodT):null;
+    var dStr=st.ref?'reference':cmpFmtDelta(df);
+    html += '<tr>'+
+      '<td><span class="st-name"><span class="st-dot" style="background:'+st.color+';"></span>'+st.name+
+        ' <span class="delta">'+st.sub+'</span></span></td>'+
+      '<td>'+fmtTime(pk.floodT)+' <span class="delta">'+Math.abs(pk.floodV).toFixed(1)+' kt</span></td>'+
+      '<td>'+fmtTime(pk.ebbT)+' <span class="delta">'+Math.abs(pk.ebbV).toFixed(1)+' kt</span></td>'+
+      '<td class="delta">'+dStr+'</td>'+
+    '</tr>';
+  }
+  document.getElementById('cmp-timing-body').innerHTML = html;
+}
+
+function cmpFetchStation(st, dp) {
+  var url = PROXY+'?station='+st.id+'&begin_date='+dp.begin+'&end_date='+dp.end+
+            '&product=currents_predictions&time_zone=lst_ldt&units=english&format=json&interval=30';
+  return fetch(url).then(function(r){ return r.json(); }).then(function(j){
+    var cp=(j.current_predictions&&j.current_predictions.cp)?j.current_predictions.cp:[];
+    if (!cp.length) throw new Error('no data for '+st.id);
+    return { st:st, curve:cp.map(function(e){ return { t:new Date(e.Time), v:parseFloat(e.Velocity_Major) }; }) };
+  });
+}
+
+function cmpLoadData() {
+  var dateStr=document.getElementById('cmp-start-date').value;
+  if (!dateStr) { alert('Please pick a start date first.'); return; }
+  var days=parseInt(document.getElementById('cmp-days-select').value,10);
+
+  document.getElementById('cmp-error-msg').style.display='none';
+  document.getElementById('cmp-demo-note').style.display='none';
+
+  var start=new Date(dateStr+'T00:00:00'), t0ms=start.getTime();
+  var end=new Date(t0ms+(days-1)*24*3600e3);
+  var dp={
+    begin:start.getFullYear()+pad(start.getMonth()+1)+pad(start.getDate()),
+    end:  end.getFullYear()+pad(end.getMonth()+1)+pad(end.getDate())
+  };
+  var dayEndMs=t0ms+24*3600e3;
+
+  cmpRenderLegend();
+
+  Promise.all(CMP_STATIONS.map(function(st){ return cmpFetchStation(st, dp); }))
+    .then(function(series){
+      cmpRenderChart(series, t0ms, days);
+      cmpRenderTiming(series, dayEndMs);
+    })
+    .catch(function(err){
+      var series=CMP_STATIONS.map(function(st){ return { st:st, curve:cmpDemoCurve(st, t0ms, days) }; });
+      var note=document.getElementById('cmp-demo-note');
+      note.textContent='Showing illustrative demo curves \u2014 the live NOAA feed is only reachable from the approved sites '+
+        '(marinopenwaterswim.org and jenniefoconnor.github.io). Once deployed there, this chart loads real predictions automatically.';
+      note.style.display='block';
+      cmpRenderChart(series, t0ms, days);
+      cmpRenderTiming(series, dayEndMs);
+    });
+}
+
+/* ====================================================================== */
+/* ==================== OPPORTUNISTIC DATES TAB (namespaced) ============ */
+/* ====================================================================== */
+
+/* ---- editable tuning ---- */
+var OPP_TIDE_STATION = '9414290';      // San Francisco — central-bay tide reference (Belvedere high water lags ~mins)
+var OPP_LAT = 37.83, OPP_LNG = -122.45; // SF Bay point used for sunrise
+var OPP_LIGHT   = 0.5;   // kt — "slack / light" ceiling (Angel Island Row; Raccoon "slack" for Belvedere)
+var OPP_STRONG  = 1.5;   // kt — "strong" flood/ebb at Crissy sunrisers
+var OPP_SUN_WIN = 75;    // min — half-window when reporting the nearby sunrise peak (display only)
+var OPP_TIDE_WIN = 90;   // min — high tide must fall within this of 8:00 (Belvedere)
+var OPP_BELV_HOUR = 8;   // Belvedere target hour (local)
+var OPP_ROW_START = 7, OPP_ROW_END = 9; // Angel Island Row window (local hours)
+
+var OPP_ROUTES = [
+  { key:'belvedere',      name:'Belvedere Cove swim',           color:'#1D9E75',
+    cond:'Saturdays with a high tide near 8:00 am at Raccoon Strait and the current slack or flooding (Raccoon Strait \u00b7 SFB1212 + SF tide).' },
+  { key:'crissy_wh',      name:'Crissy to Warming Hut sunriser', color:'#1a6fba',
+    cond:'A strong flood at the time of sunrise (Crissy Field \u00b7 SFB1202).' },
+  { key:'aquatic_crissy', name:'Aquatic Park to Crissy sunriser', color:'#8e44ad',
+    cond:'A strong ebb at the time of sunrise (Crissy Field \u00b7 SFB1202).' },
+  { key:'angel_row',      name:'Angel Island Row',               color:'#e67e22',
+    cond:'Sat/Sun 7\u20139 am with slack or light current at both Yellow Bluff (SFB1203) and Raccoon Strait (SFB1212).' }
+];
+function oppColor(k){ for(var i=0;i<OPP_ROUTES.length;i++) if(OPP_ROUTES[i].key===k) return OPP_ROUTES[i].color; return '#888'; }
+function oppName(k){ for(var i=0;i<OPP_ROUTES.length;i++) if(OPP_ROUTES[i].key===k) return OPP_ROUTES[i].name; return k; }
+
+var oppLoaded = false;
+
+/* ---- sunrise (NOAA / Almanac sunrise equation), returned as a local Date ---- */
+function oppRad(d){ return d*Math.PI/180; }
+function oppDeg(r){ return r*180/Math.PI; }
+function oppSunriseUT(y, mon, day) {
+  var N1=Math.floor(275*mon/9), N2=Math.floor((mon+9)/12), N3=(1+Math.floor((y-4*Math.floor(y/4)+2)/3));
+  var N=N1-(N2*N3)+day-30, lngHour=OPP_LNG/15, t=N+((6-lngHour)/24);
+  var M=(0.9856*t)-3.289, L=M+(1.916*Math.sin(oppRad(M)))+(0.020*Math.sin(oppRad(2*M)))+282.634; L=(L+360)%360;
+  var RA=oppDeg(Math.atan(0.91764*Math.tan(oppRad(L)))); RA=(RA+360)%360;
+  var Lq=Math.floor(L/90)*90, RAq=Math.floor(RA/90)*90; RA=(RA+(Lq-RAq))/15;
+  var sinDec=0.39782*Math.sin(oppRad(L)), cosDec=Math.cos(Math.asin(sinDec));
+  var cosH=(Math.cos(oppRad(90.833))-(sinDec*Math.sin(oppRad(OPP_LAT))))/(cosDec*Math.cos(oppRad(OPP_LAT)));
+  if (cosH>1||cosH<-1) return null;
+  var H=(360-oppDeg(Math.acos(cosH)))/15, T=H+RA-(0.06571*t)-6.622, UT=(((T-lngHour)%24)+24)%24;
+  return UT;
+}
+function oppSunrise(d) {
+  var ut=oppSunriseUT(d.getFullYear(), d.getMonth()+1, d.getDate());
+  if (ut===null) return null;
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) + ut*3600e3);
+}
+
+/* ---- demo fallback data ---- */
+function oppDemoTide(t0ms, days) {
+  var wm=2*Math.PI/(12.42*3600e3), wk=2*Math.PI/(23.93*3600e3), prev2=null, prev=null, hl=[];
+  for (var ms=0; ms<=days*24*3600e3; ms+=10*60e3) {
+    var v=3.0 + 2.6*Math.cos(wm*ms+0.6) + 1.0*Math.cos(wk*ms+1.2);
+    var pt={ t:new Date(t0ms+ms), v:v };
+    if (prev && prev2) {
+      if (prev.v>prev2.v && prev.v>=pt.v) hl.push({ t:prev.t, v:prev.v, type:'H' });
+      if (prev.v<prev2.v && prev.v<=pt.v) hl.push({ t:prev.t, v:prev.v, type:'L' });
+    }
+    prev2=prev; prev=pt;
+  }
+  return hl;
+}
+
+/* ---- range fetch with 30-day chunking (NOAA range limits) ---- */
+function oppDateStr(ms) { var d=new Date(ms); return d.getFullYear()+pad(d.getMonth()+1)+pad(d.getDate()); }
+function oppFetchRange(makeUrl, pick, startMs, endMs) {
+  var chunks=[], cur=startMs;
+  while (cur<=endMs) { var ce=Math.min(cur+29*24*3600e3, endMs); chunks.push([cur,ce]); cur=ce+24*3600e3; }
+  return Promise.all(chunks.map(function(c){
+    return fetch(makeUrl(oppDateStr(c[0]), oppDateStr(c[1]))).then(function(r){ return r.json(); }).then(pick);
+  })).then(function(arrs){ return [].concat.apply([], arrs); });
+}
+function oppFetchCurrent(id, startMs, endMs) {
+  return oppFetchRange(
+    function(b,e){ return PROXY+'?station='+id+'&begin_date='+b+'&end_date='+e+
+      '&product=currents_predictions&time_zone=lst_ldt&units=english&format=json&interval=30'; },
+    function(j){ var cp=(j.current_predictions&&j.current_predictions.cp)?j.current_predictions.cp:[];
+      if(!cp.length) throw new Error('no current data '+id);
+      return cp.map(function(e){ return { t:new Date(e.Time), v:parseFloat(e.Velocity_Major) }; }); },
+    startMs, endMs);
+}
+function oppFetchTide(startMs, endMs) {
+  return oppFetchRange(
+    function(b,e){ return PROXY+'?station='+OPP_TIDE_STATION+'&begin_date='+b+'&end_date='+e+
+      '&product=predictions&datum=MLLW&time_zone=lst_ldt&units=english&format=json&interval=hilo'; },
+    function(j){ var pr=j.predictions||[];
+      if(!pr.length) throw new Error('no tide data');
+      return pr.map(function(e){ return { t:new Date(e.t), v:parseFloat(e.v), type:e.type }; }); },
+    startMs, endMs);
+}
+
+/* ---- evaluation ---- */
+function oppAtHour(d,h,m){ return new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m||0, 0, 0); }
+
+function oppEvaluate(curves, tide, startMs, days, weekendsOnly) {
+  var rac=curves['SFB1212'], cri=curves['SFB1202'], yb=curves['SFB1203'];
+  var out=[];
+  for (var dd=0; dd<days; dd++) {
+    var d=new Date(startMs + dd*24*3600e3), dow=d.getDay(), hits=[];
+    var sr=oppSunrise(d);
+
+    // Belvedere Cove — Saturday, high tide near 8:00, Raccoon slack or flooding
+    if (dow===6) {
+      var tgt=oppAtHour(d, OPP_BELV_HOUR, 0), best=null;
+      for (var i=0;i<tide.length;i++) {
+        if (tide[i].type==='H' && Math.abs(tide[i].t-tgt) <= OPP_TIDE_WIN*60e3)
+          if (!best || Math.abs(tide[i].t-tgt) < Math.abs(best.t-tgt)) best=tide[i];
+      }
+      if (best) {
+        var rv=interpolate(rac, tgt);
+        if (rv > -OPP_LIGHT) {
+          var desc;
+          if (rv >= OPP_LIGHT) desc='flooding '+rv.toFixed(1)+' kt';
+          else { var ahead=interpolate(rac, new Date(tgt.getTime()+30*60e3)); desc=(ahead>rv?'slack, turning to flood':'near slack'); }
+          hits.push({ key:'belvedere', detail:'High tide '+fmtTime(best.t)+' ('+best.v.toFixed(1)+' ft) \u00b7 Raccoon current '+desc });
+        }
+      }
+    }
+
+    // Crissy sunrisers — strong flood / ebb at sunrise
+    if (sr && (!weekendsOnly || dow===0 || dow===6)) {
+      var cs=interpolate(cri, sr);
+      if (cs >= OPP_STRONG)
+        hits.push({ key:'crissy_wh', detail:'Sunrise '+fmtTime(sr)+' \u00b7 flooding '+cs.toFixed(1)+' kt' });
+      else if (cs <= -OPP_STRONG)
+        hits.push({ key:'aquatic_crissy', detail:'Sunrise '+fmtTime(sr)+' \u00b7 ebbing '+Math.abs(cs).toFixed(1)+' kt' });
+    }
+
+    // Angel Island Row — Sat/Sun, 7-9am, both stations light
+    if (dow===0 || dow===6) {
+      var bestMax=9, bt=null, brv=0, byv=0;
+      var ws=oppAtHour(d, OPP_ROW_START, 0).getTime(), we=oppAtHour(d, OPP_ROW_END, 0).getTime();
+      for (var hh=ws; hh<=we; hh+=10*60e3) {
+        var rvv=interpolate(rac, new Date(hh)), yvv=interpolate(yb, new Date(hh));
+        var mx=Math.max(Math.abs(rvv), Math.abs(yvv));
+        if (mx<bestMax) { bestMax=mx; bt=hh; brv=rvv; byv=yvv; }
+      }
+      if (bestMax <= OPP_LIGHT)
+        hits.push({ key:'angel_row', detail:'Calmest ~'+fmtTime(new Date(bt))+' \u00b7 Raccoon '+Math.abs(brv).toFixed(1)+' kt, Yellow Bluff '+Math.abs(byv).toFixed(1)+' kt' });
+    }
+
+    if (hits.length) out.push({ date:d, dow:dow, hits:hits });
+  }
+  return out;
+}
+
+/* ---- render ---- */
+function oppRenderKey() {
+  var html='';
+  for (var i=0;i<OPP_ROUTES.length;i++) {
+    var r=OPP_ROUTES[i];
+    html += '<div class="krow"><span class="st-dot" style="background:'+r.color+';"></span>'+
+            '<span><b>'+r.name+'</b> &mdash; '+r.cond+'</span></div>';
+  }
+  document.getElementById('opp-key').innerHTML=html;
+}
+
+function oppRenderResults(results, weeks) {
+  var el=document.getElementById('opp-results');
+  document.getElementById('opp-results-label').textContent='Matching dates \u2014 next '+weeks+' weeks';
+  if (!results.length) {
+    el.innerHTML='<p class="opp-empty">No matching dates in this window. Try a longer look-ahead, or turn off &ldquo;Weekends only&rdquo;.</p>';
+    return;
+  }
+  var html='<p class="opp-summary">'+results.length+' date'+(results.length>1?'s':'')+' with at least one good route.</p>';
+  for (var i=0;i<results.length;i++) {
+    var r=results[i];
+    html += '<div class="opp-day"><div class="opp-date"><span class="dow">'+DAY_NAMES[r.dow].slice(0,3)+'</span><br>'+
+            MONTH_NAMES[r.date.getMonth()].slice(0,3)+' '+r.date.getDate()+'</div><div class="opp-routes">';
+    for (var h=0;h<r.hits.length;h++) {
+      var hit=r.hits[h];
+      html += '<div class="route-line"><span class="st-dot" style="background:'+oppColor(hit.key)+';"></span>'+
+              '<span><span class="route-name">'+oppName(hit.key)+'</span> \u2014 '+hit.detail+'</span></div>';
+    }
+    html += '</div></div>';
+  }
+  el.innerHTML=html;
+}
+
+function oppScan() {
+  var weeks=parseInt(document.getElementById('opp-weeks').value,10);
+  var weekendsOnly=document.getElementById('opp-weekends').checked;
+  var days=weeks*7;
+  var start=new Date(); start.setHours(0,0,0,0);
+  var startMs=start.getTime(), endMs=startMs+(days-1)*24*3600e3;
+
+  document.getElementById('opp-loading').style.display='block';
+  document.getElementById('opp-error').style.display='none';
+  document.getElementById('opp-note').style.display='none';
+
+  oppRenderKey();
+
+  Promise.all([
+    oppFetchCurrent('SFB1212', startMs, endMs),
+    oppFetchCurrent('SFB1202', startMs, endMs),
+    oppFetchCurrent('SFB1203', startMs, endMs),
+    oppFetchTide(startMs, endMs)
+  ]).then(function(res){
+    document.getElementById('opp-loading').style.display='none';
+    var curves={ SFB1212:res[0], SFB1202:res[1], SFB1203:res[2] };
+    var results=oppEvaluate(curves, res[3], startMs, days, weekendsOnly);
+    oppRenderResults(results, weeks);
+  }).catch(function(err){
+    document.getElementById('opp-loading').style.display='none';
+    var curves={};
+    for (var i=0;i<CMP_STATIONS.length;i++) curves[CMP_STATIONS[i].id]=cmpDemoCurve(CMP_STATIONS[i], startMs, days);
+    var tide=oppDemoTide(startMs, days);
+    var results=oppEvaluate(curves, tide, startMs, days, weekendsOnly);
+    var note=document.getElementById('opp-note');
+    note.innerHTML='Showing illustrative demo predictions \u2014 live NOAA currents and tide load once deployed to the approved sites. '+
+      'The tide check also needs the proxy to allow the &ldquo;predictions&rdquo; product; if this tab alone stays on demo after deploy, that\u2019s the likely cause. '+
+      'Belvedere matches depend on a real high-tide-near-8am alignment and may not appear in demo data.';
+    note.style.display='block';
+    oppRenderResults(results, weeks);
+  });
+}
+
+/* ---- tab switching ---- */
+function switchTab(name) {
+  var tabs=['advisor','compare','opp'];
+  for (var i=0;i<tabs.length;i++) {
+    var on=(tabs[i]===name);
+    document.getElementById('tab-'+tabs[i]).style.display = on ? 'block' : 'none';
+    document.getElementById('tabbtn-'+tabs[i]).classList.toggle('active', on);
+  }
+  if (name==='compare' && !cmpLoaded) { cmpInitDate(); cmpLoadData(); cmpLoaded=true; }
+  if (name==='opp' && !oppLoaded) { oppScan(); oppLoaded=true; }
 }
 
 initDateTime();
